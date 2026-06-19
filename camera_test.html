@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Prueba de Cámara Sin Conexiones</title>
+  <style>
+    body { background: #0f172a; color: #f8fafc; font-family: system-ui, sans-serif; text-align: center; padding: 20px; }
+    h1 { color: #10b981; }
+    video { width: 90%; max-width: 640px; height: 480px; background: #1e293b; border: 3px solid #10b981; border-radius: 12px; margin-top: 20px; }
+    .btn { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 15px 40px; border-radius: 30px; border: none; cursor: pointer; font-weight: bold; font-size: 18px; margin: 15px; }
+    #console-log { text-align: left; background: #1e293b; color: #10b981; font-family: monospace; padding: 15px; border-radius: 8px; margin: 20px auto; max-width: 800px; height: 250px; overflow-y: scroll; font-size: 14px; border: 1px solid #475569; }
+  </style>
+</head>
+<body>
+  <h1>Prueba de Cámara Aislada 📷</h1>
+  <p style="color:#64748b;">Esta página NO se conecta a ningún servidor externo para evitar bloqueos de seguridad.</p>
+  
+  <button id="activate-btn" class="btn" onclick="startCamera()">Activar Cámara 📷</button>
+  
+  <br>
+  <video id="local-video" autoplay playsinline muted></video>
+
+  <h3>Consola de Logs en Pantalla:</h3>
+  <div id="console-log"></div>
+
+  <script>
+    const consoleLogEl = document.getElementById('console-log');
+    const activateBtn = document.getElementById('activate-btn');
+
+    function logToScreen(msg, type = 'info') {
+      const p = document.createElement('p');
+      p.style.margin = '2px 0';
+      if (type === 'error') p.style.color = '#ef4444';
+      if (type === 'warn') p.style.color = '#fbbf24';
+      p.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      consoleLogEl.appendChild(p);
+      consoleLogEl.scrollTop = consoleLogEl.scrollHeight;
+    }
+
+    console.log = function(...args) { logToScreen(args.join(' ')); };
+    console.error = function(...args) { logToScreen(args.join(' '), 'error'); };
+    console.warn = function(...args) { logToScreen(args.join(' '), 'warn'); };
+
+    window.onerror = function(message, source, lineno, colno, error) {
+      console.error(`GLOBAL ERROR: ${message} en ${source}:${lineno}`);
+      return false;
+    };
+
+    console.log("Página de prueba aislada cargada.");
+    console.log("Haz clic en 'Activar Cámara' para iniciar la solicitud de permisos.");
+
+    function startCamera() {
+      console.log("startCamera() iniciado.");
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error("getUserMedia no está soportado en este navegador.");
+        return;
+      }
+
+      console.log("Solicitando cámara con getUserMedia (video: true, audio: false)...");
+      navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        .then(stream => {
+          console.log("¡CÁMARA INICIADA CON ÉXITO! 🎉");
+          document.getElementById('local-video').srcObject = stream;
+          activateBtn.style.display = 'none';
+        })
+        .catch(err => {
+          console.error("Error al acceder a la cámara: " + err.name + " - " + err.message);
+        });
+    }
+  </script>
+</body>
+</html>
