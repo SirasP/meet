@@ -12,12 +12,13 @@
     input:focus { border-color: #3b82f6; }
     #peer-id-container { font-size: 20px; margin: 20px 0; }
     #error-log { color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 15px; border-radius: 8px; display: none; margin: 20px auto; max-width: 600px; font-size: 18px; }
+    #console-log { text-align: left; background: #1e293b; color: #10b981; font-family: monospace; padding: 15px; border-radius: 8px; margin: 20px auto; max-width: 800px; height: 200px; overflow-y: scroll; font-size: 14px; border: 1px solid #475569; }
   </style>
   <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 </head>
 <body>
   <h1>Antigravity P2P Call Room 🚀</h1>
-  <p style="color:#64748b;">Videollamada Directa Ultra Ligera para Smart TV</p>
+  <p style="color:#64748b;">Videollamada Directa Ultra Ligera con Consola de Logs</p>
   
   <div id="peer-id-container">Tu ID de Conexión: <span id="my-id" style="font-weight:bold;color:#10b981;">Generando...</span></div>
   
@@ -34,40 +35,87 @@
   <video id="local-video" autoplay playsinline muted></video>
   <video id="remote-video" autoplay playsinline></video>
 
+  <h3>Consola de Depuración (Logs en vivo):</h3>
+  <div id="console-log"></div>
+
   <script>
-    let localStream;
-    let peer;
     const myIdEl = document.getElementById('my-id');
     const errorLogEl = document.getElementById('error-log');
+    const consoleLogEl = document.getElementById('console-log');
+
+    // 1. Redireccionar la consola a la pantalla para depuración
+    function logToScreen(msg, type = 'info') {
+      const p = document.createElement('p');
+      p.style.margin = '2px 0';
+      if (type === 'error') p.style.color = '#ef4444';
+      if (type === 'warn') p.style.color = '#fbbf24';
+      p.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      consoleLogEl.appendChild(p);
+      consoleLogEl.scrollTop = consoleLogEl.scrollHeight;
+    }
+
+    const _log = console.log;
+    const _error = console.error;
+    const _warn = console.warn;
+
+    console.log = function(...args) {
+      logToScreen(args.join(' '));
+      _log.apply(console, args);
+    };
+    console.error = function(...args) {
+      logToScreen(args.join(' '), 'error');
+      _error.apply(console, args);
+    };
+    console.warn = function(...args) {
+      logToScreen(args.join(' '), 'warn');
+      _warn.apply(console, args);
+    };
+
+    window.onerror = function(message, source, lineno, colno, error) {
+      console.error(`GLOBAL ERROR: ${message} en ${source}:${lineno}`);
+      return false;
+    };
+
+    console.log("Página cargada. Inicializando consola...");
+
+    let localStream;
+    let peer;
 
     function showError(msg) {
       errorLogEl.innerText = msg;
       errorLogEl.style.display = "block";
     }
 
-    // 1. Inicializar PeerJS inmediatamente
+    // 2. Inicializar PeerJS inmediatamente
     try {
+      console.log("Creando instancia PeerJS...");
       peer = new Peer();
       
       peer.on('open', id => {
+        console.log("Conectado con éxito a PeerJS. ID asignado: " + id);
         myIdEl.innerText = id;
-        errorLogEl.style.display = "none"; // Limpiar error al conectar con éxito
+        errorLogEl.style.display = "none";
       });
 
       peer.on('disconnected', () => {
+        console.warn("PeerJS se desconectó de la red de señalización.");
         showError("Conexión de red perdida. Reconectando... 🔄");
         peer.reconnect();
       });
 
       peer.on('error', err => {
+        console.error("Error reportado por PeerJS: " + err.type + " - " + err.message);
         showError("Error de PeerJS: " + err.type + " - " + err.message);
       });
 
       peer.on('call', call => {
+        console.log("Recibiendo llamada entrante...");
         if (localStream) {
+          console.log("Respondiendo con stream existente...");
           call.answer(localStream);
           handleCallStream(call);
         } else {
+          console.log("Cámara no activa, intentando iniciar antes de responder...");
           startCamera().then(stream => {
             call.answer(stream);
             handleCallStream(call);
@@ -75,19 +123,24 @@
         }
       });
     } catch (e) {
+      console.error("Excepción en constructor PeerJS: " + e.message);
       showError("Error al iniciar Peer: " + e.message);
     }
 
-    // 2. Iniciar la cámara con fallback de audio y comprobación de soporte
+    // 3. Iniciar la cámara con fallback de audio y logs
     function startCamera() {
+      console.log("startCamera() ejecutado. Comprobando compatibilidad...");
+      
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showError("Error de Cámara: La API de video no está soportada o está desactivada en este navegador para esta dirección.");
+        console.error("navigator.mediaDevices o getUserMedia no existen en el navegador.");
+        showError("Error de Cámara: La API de video no está soportada o está desactivada en este navegador.");
         return Promise.reject(new Error("getUserMedia not supported"));
       }
 
-      // Intentar primero con video y audio
+      console.log("API mediaDevices detectada. Solicitando video + audio...");
       return navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(stream => {
+          console.log("Acceso a Cámara y Audio concedido con éxito.");
           localStream = stream;
           document.getElementById('local-video').srcObject = stream;
           const btn = document.getElementById('activate-btn');
@@ -95,13 +148,13 @@
           return stream;
         })
         .catch(err => {
-          console.warn("Fallo al iniciar audio y video, intentando solo video...", err);
+          console.warn("Fallo solicitud de Video + Audio. Intentando fallback 'Solo Video'...", err.name, err.message);
           showError("Aviso: Iniciando llamada sin micrófono (solo video) debido a: " + err.message);
           
-          // Reintento solo con video (que sabemos que funciona en la TV)
+          console.log("Solicitando Solo Video (audio: false)...");
           return navigator.mediaDevices.getUserMedia({ video: true, audio: false })
             .then(stream => {
-              // Limpiar aviso de error temporal si funciona
+              console.log("Acceso a Solo Video concedido con éxito.");
               errorLogEl.style.display = "none";
               localStream = stream;
               document.getElementById('local-video').srcObject = stream;
@@ -110,27 +163,31 @@
               return stream;
             })
             .catch(finalErr => {
+              console.error("Fallo final al abrir la cámara (Solo Video): " + finalErr.name + " - " + finalErr.message);
               showError("Error de Cámara: " + finalErr.name + " - " + finalErr.message);
               throw finalErr;
             });
         });
     }
 
-    // Iniciar cámara en la carga de la página de forma segura
+    // Intentar inicio automático silencioso en la carga
+    console.log("Intentando inicio de cámara inicial al cargar...");
     try {
       startCamera();
     } catch (e) {
-      showError("Error al iniciar cámara: " + e.message);
+      console.warn("Fallo de inicio de cámara al cargar (puede requerir clic en botón): " + e.message);
     }
 
     function handleCallStream(call) {
       call.on('stream', remoteStream => {
+        console.log("Recibido stream de video remoto.");
         document.getElementById('remote-video').srcObject = remoteStream;
       });
     }
 
     function makeCall() {
       const destId = document.getElementById('dest-id').value;
+      console.log("Intentando llamar a Peer ID: " + destId);
       if (!destId) return showError("Por favor ingresa un ID");
       if (!localStream) return showError("Cámara no activa");
       
@@ -140,4 +197,4 @@
   </script>
 </body>
 </html>
-<!-- ts: 1781898111 -->
+<!-- ts: 1781898555 -->
