@@ -72,8 +72,13 @@
       showError("Error al iniciar Peer: " + e.message);
     }
 
-    // 2. Iniciar la cámara con fallback de audio
+    // 2. Iniciar la cámara con fallback de audio y comprobación de soporte
     function startCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showError("Error de Cámara: La API de video no está soportada o está desactivada en este navegador para esta dirección.");
+        return Promise.reject(new Error("getUserMedia not supported"));
+      }
+
       // Intentar primero con video y audio
       return navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         .then(stream => {
@@ -105,8 +110,12 @@
         });
     }
 
-    // Iniciar cámara en la carga de la página
-    startCamera();
+    // Iniciar cámara en la carga de la página de forma segura
+    try {
+      startCamera();
+    } catch (e) {
+      showError("Error al iniciar cámara: " + e.message);
+    }
 
     function handleCallStream(call) {
       call.on('stream', remoteStream => {
