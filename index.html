@@ -43,7 +43,7 @@
     const errorLogEl = document.getElementById('error-log');
     const consoleLogEl = document.getElementById('console-log');
 
-    // 1. Redireccionar la consola a la pantalla para depuración
+    // 1. Redireccionar la consola a la pantalla y al servidor de logs en la PC
     function logToScreen(msg, type = 'info') {
       const p = document.createElement('p');
       p.style.margin = '2px 0';
@@ -52,6 +52,13 @@
       p.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
       consoleLogEl.appendChild(p);
       consoleLogEl.scrollTop = consoleLogEl.scrollHeight;
+
+      // Enviar el log de la TV de forma segura a la PC a través de HTTPS
+      fetch("https://shaggy-clowns-take.loca.lt/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msg, type: type, timestamp: new Date().toISOString() })
+      }).catch(err => {});
     }
 
     const _log = console.log;
