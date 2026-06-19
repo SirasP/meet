@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Antigravity P2P Call</title>
+  <style>
+    body { background: #0f172a; color: #f8fafc; font-family: system-ui, sans-serif; text-align: center; padding: 20px; }
+    h1 { color: #3b82f6; }
+    video { width: 45%; max-width: 480px; height: 360px; background: #1e293b; border: 3px solid #3b82f6; border-radius: 12px; margin: 10px; }
+    .btn { background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 12px 30px; border-radius: 30px; border: none; cursor: pointer; font-weight: bold; font-size: 16px; margin-left: 10px; }
+    input { padding: 12px 20px; border-radius: 30px; border: none; width: 280px; font-size: 16px; outline: none; background: #1e293b; color: #f8fafc; border: 2px solid #475569; }
+    input:focus { border-color: #3b82f6; }
+    #peer-id-container { font-size: 20px; margin: 20px 0; }
+    #error-log { color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 15px; border-radius: 8px; display: none; margin: 20px auto; max-width: 600px; font-size: 18px; }
+  </style>
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <h1>Antigravity P2P Call Room 🚀</h1>
+  <p style="color:#64748b;">Videollamada Directa Ultra Ligera para Smart TV</p>
+  
+  <div id="peer-id-container">Tu ID de Conexión: <span id="my-id" style="font-weight:bold;color:#10b981;">Generando...</span></div>
+  
+  <div id="error-log"></div>
+  
+  <br>
+  <div>
+    <input type="text" id="dest-id" placeholder="Ingresa el ID del otro dispositivo">
+    <button class="btn" onclick="makeCall()">Llamar 📞</button>
+  </div>
+  <br><br>
+  <video id="local-video" autoplay playsinline muted></video>
+  <video id="remote-video" autoplay playsinline></video>
+
+  <script>
+    let localStream;
+    let peer;
+    const myIdEl = document.getElementById('my-id');
+    const errorLogEl = document.getElementById('error-log');
+
+    function showError(msg) {
+      errorLogEl.innerText = msg;
+      errorLogEl.style.display = "block";
+    }
+
+    // 1. Inicializar PeerJS inmediatamente
+    try {
+      peer = new Peer();
+      
+      peer.on('open', id => {
+        myIdEl.innerText = id;
+      });
+
+      peer.on('error', err => {
+        showError("Error de PeerJS: " + err.type + " - " + err.message);
+      });
+
+      peer.on('call', call => {
+        if (localStream) {
+          call.answer(localStream);
+          handleCallStream(call);
+        } else {
+          startCamera().then(stream => {
+            call.answer(stream);
+            handleCallStream(call);
+          });
+        }
+      });
+    } catch (e) {
+      showError("Error al iniciar Peer: " + e.message);
+    }
+
+    // 2. Iniciar la cámara con fallback de audio
+    function startCamera() {
+      // Intentar primero con video y audio
+      return navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(stream => {
+          localStream = stream;
+          document.getElementById('local-video').srcObject = stream;
+          return stream;
+        })
+        .catch(err => {
+          console.warn("Fallo al iniciar audio y video, intentando solo video...", err);
+          showError("Aviso: Iniciando llamada sin micrófono (solo video) debido a: " + err.message);
+          
+          // Reintento solo con video (que sabemos que funciona en la TV)
+          return navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+            .then(stream => {
+              // Limpiar aviso de error temporal si funciona
+              errorLogEl.style.display = "none";
+              localStream = stream;
+              document.getElementById('local-video').srcObject = stream;
+              return stream;
+            })
+            .catch(finalErr => {
+              showError("Error de Cámara: " + finalErr.name + " - " + finalErr.message);
+              throw finalErr;
+            });
+        });
+    }
+
+    // Iniciar cámara en la carga de la página
+    startCamera();
+
+    function handleCallStream(call) {
+      call.on('stream', remoteStream => {
+        document.getElementById('remote-video').srcObject = remoteStream;
+      });
+    }
+
+    function makeCall() {
+      const destId = document.getElementById('dest-id').value;
+      if (!destId) return showError("Por favor ingresa un ID");
+      if (!localStream) return showError("Cámara no activa");
+      
+      const call = peer.call(destId, localStream);
+      handleCallStream(call);
+    }
+  </script>
+</body>
+</html>
+<!-- ts: 1781898111 -->
