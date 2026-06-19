@@ -7,30 +7,20 @@
     body { background: #0f172a; color: #f8fafc; font-family: system-ui, sans-serif; text-align: center; padding: 20px; }
     h1 { color: #3b82f6; }
     video { width: 45%; max-width: 480px; height: 360px; background: #1e293b; border: 3px solid #3b82f6; border-radius: 12px; margin: 10px; }
-    .btn { background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 12px 30px; border-radius: 30px; border: none; cursor: pointer; font-weight: bold; font-size: 16px; margin-left: 10px; }
-    input { padding: 12px 20px; border-radius: 30px; border: none; width: 280px; font-size: 16px; outline: none; background: #1e293b; color: #f8fafc; border: 2px solid #475569; }
-    input:focus { border-color: #3b82f6; }
-    #peer-id-container { font-size: 20px; margin: 20px 0; }
-    #error-log { color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 15px; border-radius: 8px; display: none; margin: 20px auto; max-width: 600px; font-size: 18px; }
+    .btn { background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 12px 30px; border-radius: 30px; border: none; cursor: pointer; font-weight: bold; font-size: 16px; margin: 10px; }
     #console-log { text-align: left; background: #1e293b; color: #10b981; font-family: monospace; padding: 15px; border-radius: 8px; margin: 20px auto; max-width: 800px; height: 200px; overflow-y: scroll; font-size: 14px; border: 1px solid #475569; }
+    #status { font-size: 20px; font-weight: bold; color: #fbbf24; margin: 15px 0; }
   </style>
-  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 </head>
 <body>
   <h1>Antigravity P2P Call Room 🚀</h1>
-  <p style="color:#64748b;">Videollamada Directa Ultra Ligera con Consola de Logs</p>
+  <p style="color:#64748b;">Videollamada Directa 100% Vanilla (Sin Librerías Externas)</p>
   
-  <div id="peer-id-container">Tu ID de Conexión: <span id="my-id" style="font-weight:bold;color:#10b981;">Generando...</span></div>
+  <div id="status">Estado: Inicializando...</div>
   
-  <div id="error-log"></div>
+  <button id="activate-btn" class="btn" style="background:#10b981;" onclick="startCamera()">1. Activar Cámara 📷</button>
+  <button id="call-btn" class="btn" style="background:#3b82f6; display:none;" onclick="startCall()">2. Llamar a la TV 📞</button>
   
-  <button id="activate-btn" class="btn" style="background:#10b981;margin-bottom:20px;" onclick="startCamera()">Activar Cámara 📷</button>
-  
-  <br>
-  <div>
-    <input type="text" id="dest-id" placeholder="Ingresa el ID del otro dispositivo">
-    <button class="btn" onclick="makeCall()">Llamar 📞</button>
-  </div>
   <br><br>
   <video id="local-video" autoplay playsinline muted></video>
   <video id="remote-video" autoplay playsinline></video>
@@ -39,11 +29,14 @@
   <div id="console-log"></div>
 
   <script>
-    const myIdEl = document.getElementById('my-id');
-    const errorLogEl = document.getElementById('error-log');
+    const statusEl = document.getElementById('status');
     const consoleLogEl = document.getElementById('console-log');
+    const activateBtn = document.getElementById('activate-btn');
+    const callBtn = document.getElementById('call-btn');
 
-    // 1. Redireccionar la consola a la pantalla y al servidor de logs en la PC
+    const SIGNAL_URL = "https://seven-hairs-lay.loca.lt";
+
+    // 1. Redireccionar consola a pantalla y servidor remoto
     function logToScreen(msg, type = 'info') {
       const p = document.createElement('p');
       p.style.margin = '2px 0';
@@ -53,155 +46,186 @@
       consoleLogEl.appendChild(p);
       consoleLogEl.scrollTop = consoleLogEl.scrollHeight;
 
-      // Enviar el log de la TV de forma segura a la PC a través de HTTPS
-      fetch("https://shaggy-clowns-take.loca.lt/log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg, type: type, timestamp: new Date().toISOString() })
-      }).catch(err => {});
+      if (SIGNAL_URL && !SIGNAL_URL.startsWith("SIGNAL")) {
+        fetch(SIGNAL_URL + "/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: msg, type: type, timestamp: new Date().toISOString() })
+        }).catch(() => {});
+      }
     }
 
-    const _log = console.log;
-    const _error = console.error;
-    const _warn = console.warn;
-
-    console.log = function(...args) {
-      logToScreen(args.join(' '));
-      _log.apply(console, args);
-    };
-    console.error = function(...args) {
-      logToScreen(args.join(' '), 'error');
-      _error.apply(console, args);
-    };
-    console.warn = function(...args) {
-      logToScreen(args.join(' '), 'warn');
-      _warn.apply(console, args);
-    };
+    console.log = function(...args) { logToScreen(args.join(' ')); };
+    console.error = function(...args) { logToScreen(args.join(' '), 'error'); };
+    console.warn = function(...args) { logToScreen(args.join(' '), 'warn'); };
 
     window.onerror = function(message, source, lineno, colno, error) {
       console.error(`GLOBAL ERROR: ${message} en ${source}:${lineno}`);
       return false;
     };
 
-    console.log("Página cargada. Inicializando consola...");
+    console.log("Página cargada. Inicializando aplicación Vanilla WebRTC...");
+
+    // 2. Determinar si es TV (Host) o PC/Móvil (Caller)
+    const isTV = !window.location.search.includes("caller");
+    if (isTV) {
+      statusEl.innerText = "Modo: TELEVISIÓN (Esperando llamada...)";
+      console.log("Iniciando en modo TELEVISIÓN.");
+    } else {
+      statusEl.innerText = "Modo: EMISOR (Laptop/Celular)";
+      console.log("Iniciando en modo EMISOR.");
+      callBtn.style.display = "inline-block";
+    }
 
     let localStream;
-    let peer;
+    let peerConnection;
+    let ws;
 
-    function showError(msg) {
-      errorLogEl.innerText = msg;
-      errorLogEl.style.display = "block";
-    }
+    // Configuración STUN gratuita de Google
+    const rtcConfig = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    };
 
-    // 2. Inicializar PeerJS inmediatamente
-    try {
-      console.log("Creando instancia PeerJS...");
-      peer = new Peer();
+    // 3. Conectarse al Servidor de Señalización
+    function connectSignal() {
+      if (SIGNAL_URL.startsWith("SIGNAL")) return console.warn("Servidor de señalización no configurado aún.");
       
-      peer.on('open', id => {
-        console.log("Conectado con éxito a PeerJS. ID asignado: " + id);
-        myIdEl.innerText = id;
-        errorLogEl.style.display = "none";
-      });
+      const wsUrl = SIGNAL_URL.replace("https://", "wss://") + "/signal";
+      console.log("Conectando WebSocket a: " + wsUrl);
+      
+      ws = new WebSocket(wsUrl);
+      
+      ws.onopen = () => {
+        console.log("WebSocket conectado. Registrando rol...");
+        ws.send(JSON.stringify({ type: 'register', role: isTV ? 'tv' : 'caller' }));
+        statusEl.innerText = isTV ? "Modo: TELEVISIÓN (Conectado a señalización ✅)" : "Modo: EMISOR (Conectado a señalización ✅)";
+      };
 
-      peer.on('disconnected', () => {
-        console.warn("PeerJS se desconectó de la red de señalización.");
-        showError("Conexión de red perdida. Reconectando... 🔄");
-        peer.reconnect();
-      });
-
-      peer.on('error', err => {
-        console.error("Error reportado por PeerJS: " + err.type + " - " + err.message);
-        showError("Error de PeerJS: " + err.type + " - " + err.message);
-      });
-
-      peer.on('call', call => {
-        console.log("Recibiendo llamada entrante...");
-        if (localStream) {
-          console.log("Respondiendo con stream existente...");
-          call.answer(localStream);
-          handleCallStream(call);
-        } else {
-          console.log("Cámara no activa, intentando iniciar antes de responder...");
-          startCamera().then(stream => {
-            call.answer(stream);
-            handleCallStream(call);
-          });
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        console.log("Mensaje recibido del servidor: " + msg.type);
+        
+        if (msg.type === 'offer') {
+          handleOffer(msg.offer);
+        } else if (msg.type === 'answer') {
+          handleAnswer(msg.answer);
+        } else if (msg.type === 'candidate') {
+          handleCandidate(msg.candidate);
         }
-      });
-    } catch (e) {
-      console.error("Excepción en constructor PeerJS: " + e.message);
-      showError("Error al iniciar Peer: " + e.message);
+      };
+
+      ws.onclose = () => {
+        console.warn("WebSocket cerrado. Reconectando en 3s...");
+        setTimeout(connectSignal, 3000);
+      };
+
+      ws.onerror = (err) => {
+        console.error("Error en WebSocket. Puede deberse a CORS o de red.");
+      };
     }
 
-    // 3. Iniciar la cámara con fallback de audio y logs
+    connectSignal();
+
+    // 4. Iniciar Cámara
     function startCamera() {
-      console.log("startCamera() ejecutado. Comprobando compatibilidad...");
-      
+      console.log("startCamera() ejecutado. Comprobando WebRTC...");
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.error("navigator.mediaDevices o getUserMedia no existen en el navegador.");
-        showError("Error de Cámara: La API de video no está soportada o está desactivada en este navegador.");
-        return Promise.reject(new Error("getUserMedia not supported"));
+        console.error("getUserMedia no soportado en este navegador.");
+        statusEl.innerText = "Error: Cámara no soportada en este navegador.";
+        return;
       }
 
-      console.log("API mediaDevices detectada. Solicitando video + audio...");
-      return navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      console.log("Solicitando cámara (video: true, audio: false)...");
+      return navigator.mediaDevices.getUserMedia({ video: true, audio: false })
         .then(stream => {
-          console.log("Acceso a Cámara y Audio concedido con éxito.");
+          console.log("Cámara iniciada con éxito.");
           localStream = stream;
           document.getElementById('local-video').srcObject = stream;
-          const btn = document.getElementById('activate-btn');
-          if (btn) btn.style.display = 'none';
-          return stream;
+          activateBtn.style.display = 'none';
+          
+          // Si ya existe la conexión, añadir tracks
+          if (peerConnection) {
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+          }
         })
         .catch(err => {
-          console.warn("Fallo solicitud de Video + Audio. Intentando fallback 'Solo Video'...", err.name, err.message);
-          showError("Aviso: Iniciando llamada sin micrófono (solo video) debido a: " + err.message);
-          
-          console.log("Solicitando Solo Video (audio: false)...");
-          return navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-            .then(stream => {
-              console.log("Acceso a Solo Video concedido con éxito.");
-              errorLogEl.style.display = "none";
-              localStream = stream;
-              document.getElementById('local-video').srcObject = stream;
-              const btn = document.getElementById('activate-btn');
-              if (btn) btn.style.display = 'none';
-              return stream;
-            })
-            .catch(finalErr => {
-              console.error("Fallo final al abrir la cámara (Solo Video): " + finalErr.name + " - " + finalErr.message);
-              showError("Error de Cámara: " + finalErr.name + " - " + finalErr.message);
-              throw finalErr;
-            });
+          console.error("Error de Cámara: " + err.name + " - " + err.message);
         });
     }
 
-    // Intentar inicio automático silencioso en la carga
-    console.log("Intentando inicio de cámara inicial al cargar...");
+    // Intentar inicio automático al cargar
     try {
       startCamera();
-    } catch (e) {
-      console.warn("Fallo de inicio de cámara al cargar (puede requerir clic en botón): " + e.message);
+    } catch(e) {
+      console.warn("Inicio de cámara automático bloqueado. Haz clic en el botón.");
     }
 
-    function handleCallStream(call) {
-      call.on('stream', remoteStream => {
-        console.log("Recibido stream de video remoto.");
-        document.getElementById('remote-video').srcObject = remoteStream;
-      });
+    // 5. Gestión de WebRTC
+    function createPeerConnection() {
+      console.log("Creando RTCPeerConnection...");
+      peerConnection = new RTCPeerConnection(rtcConfig);
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log("Enviando candidato ICE local...");
+          ws.send(JSON.stringify({ type: 'candidate', candidate: event.candidate }));
+        }
+      };
+
+      peerConnection.ontrack = (event) => {
+        console.log("Recibido track de video remoto.");
+        document.getElementById('remote-video').srcObject = event.streams[0];
+      };
+
+      if (localStream) {
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+      }
     }
 
-    function makeCall() {
-      const destId = document.getElementById('dest-id').value;
-      console.log("Intentando llamar a Peer ID: " + destId);
-      if (!destId) return showError("Por favor ingresa un ID");
-      if (!localStream) return showError("Cámara no activa");
+    // El Emisor inicia la llamada
+    function startCall() {
+      console.log("Iniciando llamada WebRTC...");
+      createPeerConnection();
       
-      const call = peer.call(destId, localStream);
-      handleCallStream(call);
+      peerConnection.createOffer()
+        .then(offer => peerConnection.setLocalDescription(offer))
+        .then(() => {
+          console.log("Enviando oferta SDP a la TV...");
+          ws.send(JSON.stringify({ type: 'offer', offer: peerConnection.localDescription }));
+        })
+        .catch(err => console.error("Error al crear oferta: " + err.message));
+    }
+
+    // La TV maneja la oferta de la llamada
+    function handleOffer(offer) {
+      console.log("Recibida oferta de llamada. Respondiendo...");
+      createPeerConnection();
+      
+      peerConnection.setRemoteDescription(new RTCSessionDescription(offer))
+        .then(() => peerConnection.createAnswer())
+        .then(answer => peerConnection.setLocalDescription(answer))
+        .then(() => {
+          console.log("Enviando respuesta SDP al Emisor...");
+          ws.send(JSON.stringify({ type: 'answer', answer: peerConnection.localDescription }));
+        })
+        .catch(err => console.error("Error al responder oferta: " + err.message));
+    }
+
+    function handleAnswer(answer) {
+      console.log("Recibida respuesta SDP. Estableciendo conexión...");
+      peerConnection.setRemoteDescription(new RTCSessionDescription(answer))
+        .catch(err => console.error("Error al setear descripción remota: " + err.message));
+    }
+
+    function handleCandidate(candidate) {
+      console.log("Agregando candidato ICE remoto...");
+      peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
+        .catch(err => console.error("Error al agregar candidato: " + err.message));
     }
   </script>
 </body>
 </html>
-<!-- ts: 1781898555 -->
+<!-- ts: 1781898777 -->
