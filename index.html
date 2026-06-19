@@ -51,6 +51,12 @@
       
       peer.on('open', id => {
         myIdEl.innerText = id;
+        errorLogEl.style.display = "none"; // Limpiar error al conectar con éxito
+      });
+
+      peer.on('disconnected', () => {
+        showError("Conexión de red perdida. Reconectando... 🔄");
+        peer.reconnect();
       });
 
       peer.on('error', err => {
