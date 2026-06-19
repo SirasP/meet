@@ -156,12 +156,7 @@
         });
     }
 
-    // Intentar inicio automático al cargar
-    try {
-      startCamera();
-    } catch(e) {
-      console.warn("Inicio de cámara automático bloqueado. Haz clic en el botón.");
-    }
+    // El inicio de cámara se hará únicamente mediante clic del usuario en el botón para evitar bloqueos del navegador.
 
     // 5. Gestión de WebRTC
     function createPeerConnection() {
