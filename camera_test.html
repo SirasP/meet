@@ -1,32 +1,37 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Prueba de Cámara Sin Conexiones</title>
+  <meta charset="utf-8">
+  <title>Prueba de Cámara - Copia Exacta de WebRTC.org</title>
   <style>
     body { background: #0f172a; color: #f8fafc; font-family: system-ui, sans-serif; text-align: center; padding: 20px; }
-    h1 { color: #10b981; }
-    video { width: 90%; max-width: 640px; height: 480px; background: #1e293b; border: 3px solid #10b981; border-radius: 12px; margin-top: 20px; }
-    .btn { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 15px 40px; border-radius: 30px; border: none; cursor: pointer; font-weight: bold; font-size: 18px; margin: 15px; }
-    #console-log { text-align: left; background: #1e293b; color: #10b981; font-family: monospace; padding: 15px; border-radius: 8px; margin: 20px auto; max-width: 800px; height: 250px; overflow-y: scroll; font-size: 14px; border: 1px solid #475569; }
+    h1 { color: #3b82f6; }
+    video { width: 90%; max-width: 640px; height: 480px; background: #1e293b; border: 3px solid #3b82f6; border-radius: 12px; margin-top: 20px; }
+    button { background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 15px 40px; border-radius: 30px; border: none; cursor: pointer; font-weight: bold; font-size: 18px; margin: 15px; }
+    #console-log { text-align: left; background: #1e293b; color: #10b981; font-family: monospace; padding: 15px; border-radius: 8px; margin: 20px auto; max-width: 800px; height: 200px; overflow-y: scroll; font-size: 14px; border: 1px solid #475569; }
+    #errorMsg { color: #ef4444; font-size: 18px; margin: 15px; font-weight: bold; }
   </style>
 </head>
 <body>
-  <h1>Prueba de Cámara Aislada 📷</h1>
-  <p style="color:#64748b;">Esta página NO se conecta a ningún servidor externo para evitar bloqueos de seguridad.</p>
-  
-  <button id="activate-btn" class="btn" onclick="startCamera()">Activar Cámara 📷</button>
-  
+
+  <h1>Copia del Test de Cámara Oficial (webrtc.org)</h1>
+  <p>Esta página incluye exactamente la librería <strong>adapter.js</strong> y la lógica del ejemplo de Google.</p>
+
+  <video id="gum-local" autoplay playsinline></video>
   <br>
-  <video id="local-video" autoplay playsinline muted></video>
+  <button id="showVideo">Open camera</button>
+
+  <div id="errorMsg"></div>
 
   <h3>Consola de Logs en Pantalla:</h3>
   <div id="console-log"></div>
 
-  <script>
-    const consoleLogEl = document.getElementById('console-log');
-    const activateBtn = document.getElementById('activate-btn');
+  <!-- Cargar librería de compatibilidad WebRTC Adapter de webrtc.github.io -->
+  <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
 
+  <script>
+    // Redirigir consola a pantalla
+    const consoleLogEl = document.getElementById('console-log');
     function logToScreen(msg, type = 'info') {
       const p = document.createElement('p');
       p.style.margin = '2px 0';
@@ -36,7 +41,6 @@
       consoleLogEl.appendChild(p);
       consoleLogEl.scrollTop = consoleLogEl.scrollHeight;
     }
-
     console.log = function(...args) { logToScreen(args.join(' ')); };
     console.error = function(...args) { logToScreen(args.join(' '), 'error'); };
     console.warn = function(...args) { logToScreen(args.join(' '), 'warn'); };
@@ -46,27 +50,55 @@
       return false;
     };
 
-    console.log("Página de prueba aislada cargada.");
-    console.log("Haz clic en 'Activar Cámara' para iniciar la solicitud de permisos.");
+    console.log("Cargada copia exacta de la lógica de webrtc.org...");
 
-    function startCamera() {
-      console.log("startCamera() iniciado.");
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.error("getUserMedia no está soportado en este navegador.");
-        return;
-      }
+    // Código original de webrtc.org/samples/src/content/getusermedia/gum/js/main.js
+    const constraints = window.constraints = {
+      audio: false,
+      video: true
+    };
 
-      console.log("Solicitando cámara con getUserMedia (video: true, audio: false)...");
-      navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-        .then(stream => {
-          console.log("¡CÁMARA INICIADA CON ÉXITO! 🎉");
-          document.getElementById('local-video').srcObject = stream;
-          activateBtn.style.display = 'none';
-        })
-        .catch(err => {
-          console.error("Error al acceder a la cámara: " + err.name + " - " + err.message);
-        });
+    function handleSuccess(stream) {
+      const video = document.querySelector('video');
+      const videoTracks = stream.getVideoTracks();
+      console.log('Got stream with constraints:', JSON.stringify(constraints));
+      console.log(`Using video device: ${videoTracks[0].label}`);
+      window.stream = stream; // make variable available to browser console
+      video.srcObject = stream;
     }
+
+    function handleError(error) {
+      if (error.name === 'OverconstrainedError') {
+        errorMsg(`OverconstrainedError: The constraints could not be satisfied by the available devices. Constraints: ${JSON.stringify(constraints)}`);
+      } else if (error.name === 'NotAllowedError') {
+        errorMsg('NotAllowedError: Permissions have not been granted to use your camera and microphone, you need to allow the page access to your devices in order for the demo to work.');
+      }
+      errorMsg(`getUserMedia error: ${error.name}`, error);
+    }
+
+    function errorMsg(msg, error) {
+      const errorElement = document.querySelector('#errorMsg');
+      errorElement.innerHTML += `<p>${msg}</p>`;
+      if (typeof error !== 'undefined') {
+        console.error(error);
+      }
+    }
+
+    async function init(e) {
+      console.log("Iniciando init() al hacer clic...");
+      try {
+        console.log("Llamando a navigator.mediaDevices.getUserMedia con adapter.js...");
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log("¡Éxito! getUserMedia respondió.");
+        handleSuccess(stream);
+        e.target.disabled = true;
+      } catch (e) {
+        console.error("Error capturado en init(): " + e.name + " - " + e.message);
+        handleError(e);
+      }
+    }
+
+    document.querySelector('#showVideo').addEventListener('click', e => init(e));
   </script>
 </body>
 </html>
