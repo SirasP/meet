@@ -23,6 +23,8 @@
   
   <div id="error-log"></div>
   
+  <button id="activate-btn" class="btn" style="background:#10b981;margin-bottom:20px;" onclick="startCamera()">Activar Cámara 📷</button>
+  
   <br>
   <div>
     <input type="text" id="dest-id" placeholder="Ingresa el ID del otro dispositivo">
@@ -77,6 +79,8 @@
         .then(stream => {
           localStream = stream;
           document.getElementById('local-video').srcObject = stream;
+          const btn = document.getElementById('activate-btn');
+          if (btn) btn.style.display = 'none';
           return stream;
         })
         .catch(err => {
@@ -90,6 +94,8 @@
               errorLogEl.style.display = "none";
               localStream = stream;
               document.getElementById('local-video').srcObject = stream;
+              const btn = document.getElementById('activate-btn');
+              if (btn) btn.style.display = 'none';
               return stream;
             })
             .catch(finalErr => {
