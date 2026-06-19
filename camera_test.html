@@ -2,35 +2,32 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Prueba de Cámara - Copia Exacta de WebRTC.org</title>
+  <title>Prueba de Cámara Autocontenida</title>
   <style>
     body { background: #0f172a; color: #f8fafc; font-family: system-ui, sans-serif; text-align: center; padding: 20px; }
-    h1 { color: #3b82f6; }
-    video { width: 90%; max-width: 640px; height: 480px; background: #1e293b; border: 3px solid #3b82f6; border-radius: 12px; margin-top: 20px; }
-    button { background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 15px 40px; border-radius: 30px; border: none; cursor: pointer; font-weight: bold; font-size: 18px; margin: 15px; }
-    #console-log { text-align: left; background: #1e293b; color: #10b981; font-family: monospace; padding: 15px; border-radius: 8px; margin: 20px auto; max-width: 800px; height: 200px; overflow-y: scroll; font-size: 14px; border: 1px solid #475569; }
+    h1 { color: #10b981; }
+    video { width: 90%; max-width: 640px; height: 480px; background: #1e293b; border: 3px solid #10b981; border-radius: 12px; margin-top: 20px; }
+    button { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 15px 40px; border-radius: 30px; border: none; cursor: pointer; font-weight: bold; font-size: 18px; margin: 15px; }
+    #console-log { text-align: left; background: #1e293b; color: #10b981; font-family: monospace; padding: 15px; border-radius: 8px; margin: 20px auto; max-width: 800px; height: 250px; overflow-y: scroll; font-size: 14px; border: 1px solid #475569; }
     #errorMsg { color: #ef4444; font-size: 18px; margin: 15px; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <h1>Copia del Test de Cámara Oficial (webrtc.org)</h1>
-  <p>Esta página incluye exactamente la librería <strong>adapter.js</strong> y la lógica del ejemplo de Google.</p>
+  <h1>Test de Cámara Autocontenida (Sin dependencias) 📷</h1>
+  <p>Esta página NO carga ningún script externo para evitar bloqueos del navegador de la TV.</p>
 
-  <video id="gum-local" autoplay playsinline></video>
+  <video id="gum-local" autoplay playsinline muted></video>
   <br>
-  <button id="showVideo">Open camera</button>
+  <button id="showVideo" onclick="init(this)">Open camera</button>
 
   <div id="errorMsg"></div>
 
   <h3>Consola de Logs en Pantalla:</h3>
   <div id="console-log"></div>
 
-  <!-- Cargar librería de compatibilidad WebRTC Adapter de webrtc.github.io -->
-  <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
-
   <script>
-    // Redirigir consola a pantalla
+    // 1. Configurar Consola de Logs al inicio para capturar todo
     const consoleLogEl = document.getElementById('console-log');
     function logToScreen(msg, type = 'info') {
       const p = document.createElement('p');
@@ -50,55 +47,34 @@
       return false;
     };
 
-    console.log("Cargada copia exacta de la lógica de webrtc.org...");
+    console.log("Página cargada. Esperando interacción...");
 
-    // Código original de webrtc.org/samples/src/content/getusermedia/gum/js/main.js
-    const constraints = window.constraints = {
-      audio: false,
-      video: true
-    };
-
-    function handleSuccess(stream) {
-      const video = document.querySelector('video');
-      const videoTracks = stream.getVideoTracks();
-      console.log('Got stream with constraints:', JSON.stringify(constraints));
-      console.log(`Using video device: ${videoTracks[0].label}`);
-      window.stream = stream; // make variable available to browser console
-      video.srcObject = stream;
-    }
-
-    function handleError(error) {
-      if (error.name === 'OverconstrainedError') {
-        errorMsg(`OverconstrainedError: The constraints could not be satisfied by the available devices. Constraints: ${JSON.stringify(constraints)}`);
-      } else if (error.name === 'NotAllowedError') {
-        errorMsg('NotAllowedError: Permissions have not been granted to use your camera and microphone, you need to allow the page access to your devices in order for the demo to work.');
+    async function init(btnElement) {
+      console.log("Botón presionado. Iniciando solicitud...");
+      
+      // Comprobar soporte de la API
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error("navigator.mediaDevices.getUserMedia no soportado en esta TV.");
+        document.getElementById('errorMsg').innerText = "navigator.mediaDevices.getUserMedia no soportado.";
+        return;
       }
-      errorMsg(`getUserMedia error: ${error.name}`, error);
-    }
 
-    function errorMsg(msg, error) {
-      const errorElement = document.querySelector('#errorMsg');
-      errorElement.innerHTML += `<p>${msg}</p>`;
-      if (typeof error !== 'undefined') {
-        console.error(error);
-      }
-    }
+      const constraints = {
+        audio: false,
+        video: true
+      };
 
-    async function init(e) {
-      console.log("Iniciando init() al hacer clic...");
       try {
-        console.log("Llamando a navigator.mediaDevices.getUserMedia con adapter.js...");
+        console.log("Llamando a getUserMedia con constraints: video=true, audio=false");
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        console.log("¡Éxito! getUserMedia respondió.");
-        handleSuccess(stream);
-        e.target.disabled = true;
-      } catch (e) {
-        console.error("Error capturado en init(): " + e.name + " - " + e.message);
-        handleError(e);
+        console.log("¡Cámara iniciada con éxito! Asignando stream...");
+        document.getElementById('gum-local').srcObject = stream;
+        btnElement.style.display = 'none';
+      } catch (err) {
+        console.error("Error en getUserMedia: " + err.name + " - " + err.message);
+        document.getElementById('errorMsg').innerText = "Error: " + err.name + " - " + err.message;
       }
     }
-
-    document.querySelector('#showVideo').addEventListener('click', e => init(e));
   </script>
 </body>
 </html>
